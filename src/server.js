@@ -31,7 +31,7 @@ app.disable('x-powered-by');
 // CORS allowlist:
 // - If CORS_ORIGINS is set, use that.
 // - Otherwise allow common local dev origins.
-const defaultDevOrigins = ['http://localhost:3000', 'https://evote-backend-c85g.onrender.com', 'http://localhost:3001', 'http://localhost:5173'];
+const defaultDevOrigins = ['http://localhost:3000', 'https://zippy-empanada-435ad8.netlify.app', 'http://localhost:3001', 'http://localhost:5173'];
 const allowedOrigins =
   config.corsOrigins.length > 0 ? config.corsOrigins : defaultDevOrigins;
 
