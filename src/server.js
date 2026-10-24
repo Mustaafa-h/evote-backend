@@ -76,14 +76,123 @@ app.get('/me', authVoter, authController.getMe);
 
 app.use('/admin', adminRoutes);
 
-app.post('/jitbit-webhook', (req, res) => {
-  console.log('Jitbit webhook received:');
-  console.log(req.body);
+app.post('/jitbit-webhook', async (req, res, next) => {
+  try {
+    const {
+      ticketId,
+      statusId,
+      comment,
+    } = req.body;
 
-  res.status(200).json({
-    success: true,
-    received: req.body,
-  });
+    if (!ticketId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ticketId is required',
+      });
+    }
+
+    // 1. Get fresh Zoho access token
+    const tokenParams = new URLSearchParams();
+    tokenParams.append('refresh_token', process.env.ZOHO_REFRESH_TOKEN);
+    tokenParams.append('client_id', process.env.ZOHO_CLIENT_ID);
+    tokenParams.append('client_secret', process.env.ZOHO_CLIENT_SECRET);
+    tokenParams.append('grant_type', 'refresh_token');
+
+    const tokenResponse = await fetch(
+      `${process.env.ZOHO_ACCOUNTS_URL}/oauth/v2/token`,
+      {
+        method: 'POST',
+        body: tokenParams,
+      }
+    );
+
+    const tokenData = await tokenResponse.json();
+
+    if (!tokenResponse.ok || !tokenData.access_token) {
+      console.error('Zoho token error:', tokenData);
+
+      return res.status(500).json({
+        success: false,
+        message: 'Could not generate Zoho access token',
+      });
+    }
+
+    const accessToken = tokenData.access_token;
+
+
+    // 2. Find Zoho record using Jitbit Ticket ID
+    const searchParams =
+      `{searchField:'jitbit_ticket_id',searchOperator:'Is',searchText:'${ticketId}'}`;
+
+    const searchUrl =
+      `${process.env.ZOHO_API_DOMAIN}/api/forms/it_access_request/getRecords?searchParams=` +
+      encodeURIComponent(searchParams);
+
+    const searchResponse = await fetch(searchUrl, {
+      headers: {
+        Authorization: `Zoho-oauthtoken ${accessToken}`,
+      },
+    });
+
+    const searchData = await searchResponse.json();
+
+    console.log('Zoho search result:', JSON.stringify(searchData));
+
+
+    // 3. Extract record ID
+    const results = searchData?.response?.result;
+
+    if (!results || results.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `No Zoho record found for Jitbit ticket ${ticketId}`,
+      });
+    }
+
+    const firstResult = results[0];
+
+    // Zoho returns something like:
+    // { "123456789": [ { ...record... } ] }
+    const recordId = Object.keys(firstResult)[0];
+
+
+    // 4. Prepare Zoho update
+    const inputData = {
+      jitbit_status: statusId?.toString() || '',
+      jitbit_last_comment: comment || '',
+    };
+
+    const updateParams = new URLSearchParams();
+    updateParams.append('recordId', recordId);
+    updateParams.append('inputData', JSON.stringify(inputData));
+
+
+    // 5. Update Zoho record
+    const updateResponse = await fetch(
+      `${process.env.ZOHO_API_DOMAIN}/api/forms/json/it_access_request/updateRecord`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: updateParams,
+      }
+    );
+
+    const updateData = await updateResponse.json();
+
+    console.log('Zoho update result:', updateData);
+
+    res.status(200).json({
+      success: true,
+      ticketId,
+      zohoRecordId: recordId,
+      zohoUpdate: updateData,
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // /me at root (not under /auth)
