@@ -122,7 +122,7 @@ app.post('/jitbit-webhook', async (req, res, next) => {
 
     // 2. Find Zoho record using Jitbit Ticket ID
     const searchParams =
-      `{searchField:'jitbit_ticket_id',searchOperator:'Is',searchText:'${ticketId}'}`;
+  `{searchField:'Jitbit Ticket ID',searchOperator:'Is',searchText:'${ticketId}'}`;
 
     const searchUrl =
       `${process.env.ZOHO_API_DOMAIN}/api/forms/it_access_request/getRecords?searchParams=` +
