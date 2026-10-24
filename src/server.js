@@ -120,37 +120,43 @@ app.post('/jitbit-webhook', async (req, res, next) => {
     const accessToken = tokenData.access_token;
 
 
-    // 2. Find Zoho record using Jitbit Ticket ID
-    const searchParams =
-  `{searchField:'Jitbit Ticket ID',searchOperator:'Is',searchText:'${ticketId}'}`;
+// 2. Get all IT access request records
+const recordsUrl =
+  `${process.env.ZOHO_API_DOMAIN}/api/forms/it_access_request/getRecords`;
 
-    const searchUrl =
-      `${process.env.ZOHO_API_DOMAIN}/api/forms/it_access_request/getRecords?searchParams=` +
-      encodeURIComponent(searchParams);
+const recordsResponse = await fetch(recordsUrl, {
+  headers: {
+    Authorization: `Zoho-oauthtoken ${accessToken}`,
+  },
+});
 
-    const searchResponse = await fetch(searchUrl, {
-      headers: {
-        Authorization: `Zoho-oauthtoken ${accessToken}`,
-      },
-    });
+const recordsData = await recordsResponse.json();
 
-    const searchRaw = await searchResponse.text();
+console.log('Zoho records result:', JSON.stringify(recordsData));
 
-console.log('Zoho search status:', searchResponse.status);
-console.log('Zoho search raw:', searchRaw);
+const rawResults = recordsData?.response?.result || [];
 
-let searchData;
+// Flatten Zoho response structure
+const records = rawResults.flatMap(item => {
+  const key = Object.keys(item)[0];
+  return item[key] || [];
+});
 
-try {
-  searchData = JSON.parse(searchRaw);
-} catch (err) {
-  return res.status(500).json({
+// Find the record matching this Jitbit ticket
+const matchingRecord = records.find(
+  record => String(record.jitbit_ticket_id) === String(ticketId)
+);
+
+if (!matchingRecord) {
+  return res.status(404).json({
     success: false,
-    message: 'Zoho search returned non-JSON response',
-    status: searchResponse.status,
-    response: searchRaw,
+    message: `No Zoho record found for Jitbit ticket ${ticketId}`,
   });
 }
+
+const recordId = matchingRecord.Zoho_ID.toString();
+
+console.log('Matched Zoho record:', recordId);
 
     console.log('Zoho search result:', JSON.stringify(searchData));
 
