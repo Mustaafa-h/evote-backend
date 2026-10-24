@@ -119,64 +119,43 @@ app.post('/jitbit-webhook', async (req, res, next) => {
 
     const accessToken = tokenData.access_token;
 
+    // 2. Get all IT access request records
+    const recordsUrl =
+      `${process.env.ZOHO_API_DOMAIN}/api/forms/it_access_request/getRecords`;
 
-// 2. Get all IT access request records
-const recordsUrl =
-  `${process.env.ZOHO_API_DOMAIN}/api/forms/it_access_request/getRecords`;
+    const recordsResponse = await fetch(recordsUrl, {
+      headers: {
+        Authorization: `Zoho-oauthtoken ${accessToken}`,
+      },
+    });
 
-const recordsResponse = await fetch(recordsUrl, {
-  headers: {
-    Authorization: `Zoho-oauthtoken ${accessToken}`,
-  },
-});
+    const recordsData = await recordsResponse.json();
 
-const recordsData = await recordsResponse.json();
+    console.log('Zoho records result:', JSON.stringify(recordsData));
 
-console.log('Zoho records result:', JSON.stringify(recordsData));
+    const rawResults = recordsData?.response?.result || [];
 
-const rawResults = recordsData?.response?.result || [];
+    // Flatten Zoho response structure
+    const records = rawResults.flatMap(item => {
+      const key = Object.keys(item)[0];
+      return item[key] || [];
+    });
 
-// Flatten Zoho response structure
-const records = rawResults.flatMap(item => {
-  const key = Object.keys(item)[0];
-  return item[key] || [];
-});
+    // 3. Find Zoho record matching Jitbit ticket ID
+    const matchingRecord = records.find(
+      record => String(record.jitbit_ticket_id) === String(ticketId)
+    );
 
-// Find the record matching this Jitbit ticket
-const matchingRecord = records.find(
-  record => String(record.jitbit_ticket_id) === String(ticketId)
-);
-
-if (!matchingRecord) {
-  return res.status(404).json({
-    success: false,
-    message: `No Zoho record found for Jitbit ticket ${ticketId}`,
-  });
-}
-
-const recordId = matchingRecord.Zoho_ID.toString();
-
-console.log('Matched Zoho record:', recordId);
-
-    console.log('Zoho search result:', JSON.stringify(searchData));
-
-
-    // 3. Extract record ID
-    const results = searchData?.response?.result;
-
-    if (!results || results.length === 0) {
+    if (!matchingRecord) {
       return res.status(404).json({
         success: false,
         message: `No Zoho record found for Jitbit ticket ${ticketId}`,
       });
     }
 
-    const firstResult = results[0];
+    const recordId = matchingRecord.Zoho_ID.toString();
 
-    // Zoho returns something like:
-    // { "123456789": [ { ...record... } ] }
-    const recordId = Object.keys(firstResult)[0];
-
+    console.log('Matched Zoho record:', recordId);
 
     // 4. Prepare Zoho update
     const inputData = {
@@ -187,7 +166,6 @@ console.log('Matched Zoho record:', recordId);
     const updateParams = new URLSearchParams();
     updateParams.append('recordId', recordId);
     updateParams.append('inputData', JSON.stringify(inputData));
-
 
     // 5. Update Zoho record
     const updateResponse = await fetch(
@@ -212,6 +190,7 @@ console.log('Matched Zoho record:', recordId);
       zohoRecordId: recordId,
       zohoUpdate: updateData,
     });
+
   } catch (err) {
     next(err);
   }
@@ -287,5 +266,3 @@ async function start() {
 
 start();
 
-
-start();
