@@ -136,10 +136,14 @@ app.post('/jitbit-webhook', async (req, res, next) => {
     const rawResults = recordsData?.response?.result || [];
 
     // Flatten Zoho response structure
-    const records = rawResults.flatMap(item => {
-      const key = Object.keys(item)[0];
-      return item[key] || [];
-    });
+   const records = rawResults.flatMap(item => {
+  const recordId = Object.keys(item)[0];
+
+  return (item[recordId] || []).map(record => ({
+    ...record,
+    exactRecordId: recordId,
+  }));
+});
 
     // 3. Find Zoho record matching Jitbit ticket ID
     const matchingRecord = records.find(
@@ -153,7 +157,7 @@ app.post('/jitbit-webhook', async (req, res, next) => {
       });
     }
 
-    const recordId = matchingRecord.Zoho_ID.toString();
+    const recordId = matchingRecord.exactRecordId;
 
     console.log('Matched Zoho record:', recordId);
 
