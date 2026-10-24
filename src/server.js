@@ -134,7 +134,23 @@ app.post('/jitbit-webhook', async (req, res, next) => {
       },
     });
 
-    const searchData = await searchResponse.json();
+    const searchRaw = await searchResponse.text();
+
+console.log('Zoho search status:', searchResponse.status);
+console.log('Zoho search raw:', searchRaw);
+
+let searchData;
+
+try {
+  searchData = JSON.parse(searchRaw);
+} catch (err) {
+  return res.status(500).json({
+    success: false,
+    message: 'Zoho search returned non-JSON response',
+    status: searchResponse.status,
+    response: searchRaw,
+  });
+}
 
     console.log('Zoho search result:', JSON.stringify(searchData));
 
