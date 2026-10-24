@@ -140,17 +140,21 @@ async function start() {
   try {
     await connectMongo();
 
-    // 🔴 Seed initial admin if needed
+    // Only seed admin if MongoDB connected successfully
     await adminService.ensureInitialAdmin();
 
-    app.listen(PORT, () => {
-      console.log(`Evote API listening on port ${PORT}`);
-    });
+    console.log('MongoDB connected');
   } catch (err) {
-    console.error('Failed to start server:', err);
-    process.exit(1);
+    console.error('MongoDB connection failed:', err.message);
+    console.warn('Starting API without MongoDB...');
   }
+
+  app.listen(PORT, () => {
+    console.log(`Evote API listening on port ${PORT}`);
+  });
 }
+
+start();
 
 
 start();
