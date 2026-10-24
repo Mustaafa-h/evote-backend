@@ -76,6 +76,16 @@ app.get('/me', authVoter, authController.getMe);
 
 app.use('/admin', adminRoutes);
 
+app.post('/jitbit-webhook', (req, res) => {
+  console.log('Jitbit webhook received:');
+  console.log(req.body);
+
+  res.status(200).json({
+    success: true,
+    received: req.body,
+  });
+});
+
 // /me at root (not under /auth)
 app.get('/me', authVoter, authController.getMe);
 
